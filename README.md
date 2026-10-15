@@ -28,8 +28,8 @@ else in this course is detail on top of that one idea.
 
 Work through them in order. Each one ends with you pushing a commit and watching GitHub.
 
-- [ ] **01 — [Your first pipeline](lessons/01-first-pipeline.md)** — workflow anatomy, `on`/`jobs`/`steps`, `npm ci`, seeing red and going green
-- [ ] **02 — Fast and honest** — caching, parallel jobs, a matrix across Node versions, cancelling stale runs
+- [x] **01 — [Your first pipeline](lessons/01-first-pipeline.md)** — workflow anatomy, `on`/`jobs`/`steps`, `npm ci`, seeing red and going green
+- [ ] **02 — [Fast and honest](lessons/02-fast-and-honest.md)** — caching, parallel jobs, a matrix across Node versions, cancelling stale runs
 - [ ] **03 — Gates** — PR-triggered runs, required status checks, branch protection: making CI *mean* something
 - [ ] **04 — Artifacts and reports** — uploading build output and coverage, job summaries
 - [ ] **05 — Secrets and environments** — repo secrets, `permissions:`, environments with manual approval
