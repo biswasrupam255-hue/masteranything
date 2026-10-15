@@ -12,8 +12,10 @@ export function createApp(): Express {
   app.get("/api/greet", (req, res) => {
     const name = typeof req.query.name === "string" ? req.query.name : "";
 
+    const shout = req.query.shout === "1" || req.query.shout === "true";
+
     try {
-      res.json({ message: greet(name) });
+      res.json({ message: greet(name, { shout }) });
     } catch {
       res.status(400).json({ error: "name is required" });
     }
