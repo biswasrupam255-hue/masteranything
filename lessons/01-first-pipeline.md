@@ -32,6 +32,10 @@ to actually notice:
 
 **`on:`** — the trigger. `push` to `main` and *any* `pull_request`. Nothing else makes it run.
 
+> Trivia you will hit eventually: in YAML 1.1, the bare word `on` is a *boolean*, so some
+> tools parse this key as `True`. GitHub reads it correctly, but that's why you'll see
+> `"on":` quoted in some repos and linters.
+
 **`runs-on: ubuntu-latest`** — a brand-new machine, every time. It has git, Node, Docker and
 common tooling preinstalled, and *nothing* of your project. That's why step one is checkout.
 
