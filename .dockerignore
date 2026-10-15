@@ -1,0 +1,15 @@
+# Everything here is excluded from the build context sent to the daemon.
+# Keeping this tight makes builds faster AND stops secrets/junk leaking into images.
+node_modules
+dist
+coverage
+.git
+.github
+.gitignore
+.gitattributes
+lessons
+scripts
+*.md
+.env
+.env.*
+npm-debug.log

@@ -145,12 +145,109 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+  # ------------------------------------------------------------------ image
+  # Builds on EVERY run so a broken Dockerfile fails the PR.
+  # Pushes only from main - PRs must never publish images.
+  image:
+    needs: [quality]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write      # widened HERE only, not at the top of the file
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # BuildKit: parallel stages, better caching, cache export support.
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # No PAT needed: the run's own ephemeral token has packages: write.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Generates tags and OCI labels from git context, so you never hand-roll
+      # tag strings in shell.
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha,format=long
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Stamp the commit into the image so /health can report it.
+          build-args: |
+            APP_VERSION=${{ github.sha }}
+          # Layer cache lives in the Actions cache, so unchanged layers are
+          # not rebuilt on every run.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # -------------------------------------------------------- container-smoke
+  # Runs the pushed image BY DIGEST and proves it contains this commit.
+  container-smoke:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run the image and probe it
+        run: |
+          # A digest is immutable. A tag can be moved; "latest" is a promise
+          # nobody keeps. Deploy digests, not tags.
+          IMAGE="ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}"
+          echo "running $IMAGE"
+          docker run -d --name app -p 3000:3000 "$IMAGE"
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/health -o health.json; then break; fi
+            sleep 1
+          done
+
+          echo "response: $(cat health.json)"
+          # The image must report THIS commit, not a stale layer.
+          test "$(jq -r .version < health.json)" = "${{ github.sha }}"
+          docker rm -f app
+
+      - name: Record it
+        run: |
+          {
+            echo "### Container"
+            echo ""
+            echo "- image: \`ghcr.io/${{ github.repository }}\`"
+            echo "- digest: \`${{ needs.image.outputs.digest }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # ------------------------------------------------------------------ ci-ok
   # Still the only required check. We just added a whole new job above and
   # branch protection needed zero changes. That is why this job exists.
   ci-ok:
     if: always()
-    needs: [quality, test, build, smoke]
+    needs: [quality, test, build, smoke, image, container-smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
