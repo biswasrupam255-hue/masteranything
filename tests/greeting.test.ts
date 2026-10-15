@@ -11,6 +11,10 @@ describe("greet", () => {
     expect(greet("  Rupam  ")).toBe("Hello, Rupam!");
   });
 
+  it("shouts when asked", () => {
+    expect(greet("Rupam", { shout: true })).toBe("HELLO, RUPAM!");
+  });
+
   it("rejects an empty name", () => {
     expect(() => greet("   ")).toThrow("name is required");
   });
