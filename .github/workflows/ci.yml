@@ -1,0 +1,44 @@
+# .github/workflows/ci.yml
+# Lesson 01 — the simplest honest pipeline. We make it faster in lesson 02.
+
+name: CI
+
+# WHEN to run. These two cover ~90% of real-world CI.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # "verify" is just a name we chose. It appears in the GitHub UI.
+  verify:
+    # A fresh, empty Ubuntu VM. Nothing of yours is on it.
+    runs-on: ubuntu-latest
+
+    steps:
+      # Our repo is NOT on the runner until we ask for it.
+      - name: Check out the code
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc   # same Node version as your laptop
+          cache: npm                  # reuse ~/.npm between runs
+
+      # npm ci, not npm install: installs exactly package-lock.json,
+      # fails if the lockfile and package.json disagree. Reproducible.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
