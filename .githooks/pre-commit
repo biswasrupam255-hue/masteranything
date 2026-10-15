@@ -1,0 +1,13 @@
+#!/bin/sh
+# Enable with:  git config core.hooksPath .githooks
+#
+# A hook is a CONVENIENCE, never a control: anyone can skip it with
+# --no-verify, and a fresh clone has hooks disabled until someone opts in.
+# CI is the enforcement. This just saves you a round trip.
+
+set -e
+
+echo "pre-commit: lint + typecheck"
+npm run lint
+npm run typecheck
+echo "pre-commit: ok"
