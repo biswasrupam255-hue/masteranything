@@ -33,8 +33,8 @@ Work through them in order. Each one ends with you pushing a commit and watching
 - [x] **03 — [Gates](lessons/03-gates.md)** — PR-triggered runs, required status checks, branch protection: making CI *mean* something
 - [x] **04 — [Artifacts and reports](lessons/04-artifacts-and-reports.md)** — uploading build output and coverage, job summaries
 - [x] **05 — [Secrets and environments](lessons/05-secrets-and-environments.md)** — repo secrets, `permissions:`, environments with manual approval
-- [ ] **06 — [Containers](lessons/06-containers.md)** — multi-stage `Dockerfile`, build and push to GHCR, tagging by git SHA
-- [ ] **07 — Continuous delivery** — a deploy job, staging vs production, promotion, rollback
+- [x] **06 — [Containers](lessons/06-containers.md)** — multi-stage `Dockerfile`, build and push to GHCR, tagging by git SHA
+- [ ] **07 — [Continuous delivery](lessons/07-continuous-delivery.md)** — a deploy job, staging vs production, promotion, rollback
 - [ ] **08 — Team guardrails** — Dependabot, CODEOWNERS, pre-commit hooks, reusable workflows
 
 ## Vocabulary, once

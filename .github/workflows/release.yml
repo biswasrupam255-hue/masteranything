@@ -1,0 +1,80 @@
+# .github/workflows/release.yml
+# Cutting a version: git tag -> semver-tagged image + a GitHub release.
+#
+# Why a separate workflow: it answers a different question. ci.yml asks
+# "is main healthy?" on every commit. This asks "what are we calling v1.2.0?"
+# and runs a handful of times a year.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write    # create the GitHub release
+      packages: write    # push the image
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Release notes are generated from commit history, so we need all
+          # of it. The default shallow clone has one commit.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Never publish a version you have not tested, however green main was.
+      - run: npm ci
+      - run: npm test
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          # v1.2.3 produces 1.2.3, 1.2 and 1 - so consumers can pin as
+          # loosely or as tightly as they want.
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,format=long
+
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            --notes "Image: \`ghcr.io/${{ github.repository }}:${{ github.ref_name }}\`
+Digest: \`${{ steps.build.outputs.digest }}\`"
