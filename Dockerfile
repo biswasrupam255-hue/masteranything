@@ -3,7 +3,7 @@
 # =============================================================== build stage
 # Full toolchain lives here: dev dependencies, TypeScript, the compiler.
 # None of it survives into the final image.
-FROM node:24-alpine AS build
+FROM node:25-alpine AS build
 WORKDIR /app
 
 # Copy manifests FIRST, install, THEN copy source. Docker caches per layer, so
@@ -18,13 +18,13 @@ RUN npm run build
 
 # ============================================================ production deps
 # A separate stage so the runtime gets node_modules WITHOUT dev dependencies.
-FROM node:24-alpine AS deps
+FROM node:25-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 # ============================================================= runtime stage
-FROM node:24-alpine AS runtime
+FROM node:25-alpine AS runtime
 
 # Stamped at build time so a running container can tell you exactly which
 # commit it is. GET /health reports it.
