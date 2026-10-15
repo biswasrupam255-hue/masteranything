@@ -160,3 +160,91 @@ jobs:
           echo "upstream results: ${{ join(needs.*.result, ', ') }}"
           exit 1
       - run: echo "all required jobs passed"
+
+  # -------------------------------------------------------- deploy-staging
+  # Only on main, only on a real push. A pull_request run must NEVER reach
+  # deployment secrets - see lesson 05 on forks.
+  deploy-staging:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [ci-ok]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Naming an environment is what unlocks that environment's secrets and
+    # variables, and what makes GitHub record a deployment.
+    environment:
+      name: staging
+      url: ${{ vars.TARGET_URL }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - name: Deploy
+        env:
+          # Map secrets into env vars. Do NOT interpolate ${{ secrets.X }}
+          # directly inside a run: script - that pastes the value into the
+          # shell command line, where it can land in error messages and
+          # process listings.
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: |
+          echo "deploying ${GITHUB_SHA::7} to ${{ vars.TARGET_URL }}"
+          echo "artifact contents:"
+          ls -1 dist
+          # Check a secret exists WITHOUT printing it.
+          echo "token length: ${#DEPLOY_TOKEN}"
+          test -n "$DEPLOY_TOKEN"
+
+      - name: What masking does, and does not, protect you from
+        env:
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: |
+          echo "1. printed straight : $DEPLOY_TOKEN"
+          echo "2. base64 encoded   : $(printf %s "$DEPLOY_TOKEN" | base64)"
+          echo "3. reversed         : $(printf %s "$DEPLOY_TOKEN" | rev)"
+          echo "Only #1 is masked. Masking is string matching, not security."
+
+      - name: Record it
+        run: |
+          {
+            echo "### Deployed to staging"
+            echo ""
+            echo "- commit: \`${GITHUB_SHA::7}\`"
+            echo "- url: ${{ vars.TARGET_URL }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ----------------------------------------------------- deploy-production
+  # Identical mechanics, one difference: this environment has a required
+  # reviewer, so the job PAUSES here until a human clicks Approve.
+  deploy-production:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [deploy-staging]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: ${{ vars.TARGET_URL }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - name: Deploy
+        env:
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: |
+          echo "deploying ${GITHUB_SHA::7} to ${{ vars.TARGET_URL }}"
+          # Same name, DIFFERENT value: this is the production environment's
+          # secret, which the staging job could not read.
+          echo "token length: ${#DEPLOY_TOKEN}"
+          test -n "$DEPLOY_TOKEN"
+
+      - name: Record it
+        run: |
+          {
+            echo "### Deployed to production"
+            echo ""
+            echo "- commit: \`${GITHUB_SHA::7}\`"
+            echo "- approved by: @${{ github.actor }}"
+          } >> "$GITHUB_STEP_SUMMARY"

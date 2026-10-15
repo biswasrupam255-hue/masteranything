@@ -31,8 +31,8 @@ Work through them in order. Each one ends with you pushing a commit and watching
 - [x] **01 — [Your first pipeline](lessons/01-first-pipeline.md)** — workflow anatomy, `on`/`jobs`/`steps`, `npm ci`, seeing red and going green
 - [x] **02 — [Fast and honest](lessons/02-fast-and-honest.md)** — caching, parallel jobs, a matrix across Node versions, cancelling stale runs
 - [x] **03 — [Gates](lessons/03-gates.md)** — PR-triggered runs, required status checks, branch protection: making CI *mean* something
-- [ ] **04 — [Artifacts and reports](lessons/04-artifacts-and-reports.md)** — uploading build output and coverage, job summaries
-- [ ] **05 — Secrets and environments** — repo secrets, `permissions:`, environments with manual approval
+- [x] **04 — [Artifacts and reports](lessons/04-artifacts-and-reports.md)** — uploading build output and coverage, job summaries
+- [ ] **05 — [Secrets and environments](lessons/05-secrets-and-environments.md)** — repo secrets, `permissions:`, environments with manual approval
 - [ ] **06 — Containers** — multi-stage `Dockerfile`, build and push to GHCR, tagging by git SHA
 - [ ] **07 — Continuous delivery** — a deploy job, staging vs production, promotion, rollback
 - [ ] **08 — Team guardrails** — Dependabot, CODEOWNERS, pre-commit hooks, reusable workflows
