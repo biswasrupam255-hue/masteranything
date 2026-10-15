@@ -1,0 +1,89 @@
+# .github/workflows/deploy.yml
+# Manual deploy of ANY previously built image - which is also your rollback.
+#
+# Rollback is not a special mechanism. It is an ordinary deploy of an older,
+# known-good artifact. If deploying is a button, rolling back is the same
+# button with a different value, and that is the whole trick.
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Where to deploy
+        type: choice
+        options: [staging, production]
+        required: true
+      image:
+        description: "Image to deploy: a digest (sha256:...) or a tag. Blank = latest."
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  # Never let two deploys to the same environment overlap. Unlike CI, we do
+  # NOT cancel in progress - killing a half-finished deploy is worse than
+  # queueing behind it.
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    # Protection rules apply here too: dispatching to production still needs
+    # the approval click. A manual deploy is not an escape hatch.
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ vars.TARGET_URL }}
+    steps:
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve, pull and verify the image
+        env:
+          REQUESTED: ${{ inputs.image }}
+        run: |
+          REF="${REQUESTED:-latest}"
+          case "$REF" in
+            sha256:*) IMAGE="ghcr.io/${{ github.repository }}@$REF" ;;
+            *)        IMAGE="ghcr.io/${{ github.repository }}:$REF" ;;
+          esac
+          echo "resolved: $IMAGE"
+
+          # Pull BEFORE declaring a deploy. A typo in a digest should fail
+          # here, not halfway through replacing a running service.
+          docker pull "$IMAGE"
+
+          docker run -d --name app -p 3000:3000 "$IMAGE"
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/health -o health.json; then break; fi
+            sleep 1
+          done
+
+          echo "health: $(cat health.json)"
+          test "$(jq -r .status < health.json)" = "ok"
+
+          echo "DEPLOYED_IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          echo "DEPLOYED_VERSION=$(jq -r .version < health.json)" >> "$GITHUB_ENV"
+          docker rm -f app
+
+      - name: Record it
+        run: |
+          {
+            echo "### Manual deploy to ${{ inputs.environment }}"
+            echo ""
+            echo "- image: \`$DEPLOYED_IMAGE\`"
+            echo "- version reported by the app: \`$DEPLOYED_VERSION\`"
+            echo "- triggered by: @${{ github.actor }}"
+          } >> "$GITHUB_STEP_SUMMARY"
