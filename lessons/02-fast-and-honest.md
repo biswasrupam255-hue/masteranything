@@ -94,6 +94,36 @@ in lesson 06, to push a container image).
 - `paths-ignore: ["**.md", "lessons/**"]` — a README typo shouldn't trigger a build.
   (Careful: this applies to `push` only here, so PR runs still cover everything.)
 
+## 5b. What it actually measured (your repo, real numbers)
+
+We ran both shapes on the same code:
+
+| Pipeline | Wall clock |
+| --- | --- |
+| Lesson 01, one job | **23s** |
+| Lesson 02, parallel + matrix | **37s** |
+
+The "optimised" one is *slower*. The per-job numbers say why:
+
+```
+quality         17:28:10 -> 17:28:26   [16s]  test (node 22)  17:28:10 -> 17:28:22   [12s]   > genuinely parallel, free
+test (node 24)  17:28:10 -> 17:28:22   [12s]  /
+build           17:28:29 -> 17:28:43   [14s]  <- waited on needs:, then a 4th VM boot
+```
+
+Every job pays ~12s of fixed cost: allocate VM, checkout, setup Node, `npm ci`. Our `build`
+job spent 14s to run a 2s `tsc`.
+
+**So the real rule is: parallelism is free, but jobs are not.** Split when a job is slow and
+independent. Here, `build` should either be merged back into `quality`, or - better, lesson
+04 - build once and hand the output onward as an artifact instead of rebuilding.
+
+Keep the matrix anyway. It didn't make anything faster; it made it *truer*. You now have
+evidence the code runs on Node 22 and 24, which no amount of single-job speed would give you.
+
+> The habit worth stealing from this lesson: **measure your pipeline before you believe it.**
+> `gh run view <id> --json jobs` gives you exactly the table above.
+
 ## 6. Exercises
 
 1. **Make the matrix earn its keep.** Add `"20"` to the `node:` list and push. It goes red —
