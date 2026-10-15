@@ -28,6 +28,10 @@ jobs:
       - uses: ./.github/actions/node-setup
       - run: npm run lint
       - run: npm run typecheck
+      # Structural sanity check on the workflow files themselves.
+      # A run: block that loses its indentation still parses as YAML
+      # but is rejected by GitHub - this catches it before it ships.
+      - run: npm run check:workflows
 
   # ------------------------------------------------------------------- test
   test:

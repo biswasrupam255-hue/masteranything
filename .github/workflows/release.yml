@@ -67,9 +67,19 @@ jobs:
       - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
         run: |
+          # Notes are written to a file rather than passed as a multi-line
+          # string. The first version of this step had its second line at
+          # column 0 inside this block, which ended the YAML block scalar and
+          # turned the rest into a stray top-level key: valid YAML, invalid
+          # workflow, 0-second startup failure on every single push.
+          {
+            echo "Image: ${IMAGE}"
+            echo "Digest: ${DIGEST}"
+          } > release-notes.md
           gh release create "${{ github.ref_name }}" \
             --title "${{ github.ref_name }}" \
             --generate-notes \
-            --notes "Image: \`ghcr.io/${{ github.repository }}:${{ github.ref_name }}\`
-Digest: \`${{ steps.build.outputs.digest }}\`"
+            --notes-file release-notes.md
