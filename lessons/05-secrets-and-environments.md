@@ -69,18 +69,35 @@ We configured `production` with required reviewers and a branch policy:
 `deploy-staging` prints the same (fake) secret three ways on purpose:
 
 ```bash
-echo "1. printed straight : $DEPLOY_TOKEN"                            # ***
-echo "2. base64 encoded   : $(printf %s "$DEPLOY_TOKEN" | base64)"    # LEAKED
-echo "3. reversed         : $(printf %s "$DEPLOY_TOKEN" | rev)"       # LEAKED
+echo "1. printed straight : $DEPLOY_TOKEN"
+echo "2. base64 encoded   : $(printf %s "$DEPLOY_TOKEN" | base64)"
+echo "3. reversed         : $(printf %s "$DEPLOY_TOKEN" | rev)"
 ```
 
-GitHub masks secrets by **searching log output for the literal string**. Transform it at all
-- base64, reverse, split, gzip - and the mask does nothing. Any dependency in `node_modules`
-can read `process.env` and POST it somewhere, and no mask will ever see that.
+The actual output from our run, which is **not** what this lesson first claimed:
 
-Masking is a safety net for accidents, not a control against malice. The controls that matter
-are scope (environment secrets), short-lived credentials (OIDC), and not running untrusted
-code with secrets in scope (forks, next).
+```
+1. printed straight : ***
+2. base64 encoded   : ***                              <- also masked
+3. reversed         : a3f9-nekot-yolped-gnigats-EKAF   <- LEAKED
+```
+
+GitHub does better than a naive literal match: when you register a secret it also masks
+common encodings of it, base64 among them. So #2 is covered.
+
+#3 is not, and that is the point. Masking is **pattern matching over log text**, with a
+fixed set of known transforms. Anything outside that set - reverse, rot13, split in half,
+gzip, hex, or just posting it to an attacker's server instead of printing it - passes
+straight through. Any dependency in `node_modules` can read `process.env` and exfiltrate it
+without writing a single line to the log, where no mask could ever apply.
+
+So: masking is a safety net for *accidents*, not a control against *malice*. The controls
+that matter are scope (environment secrets), short-lived credentials (OIDC), and not running
+untrusted code with secrets in scope (forks, next).
+
+> **The habit this is really teaching:** this lesson originally asserted that base64 defeats
+> masking. Running it proved otherwise. Pipelines are full of confident folklore - check it
+> against a real run before you believe it, exactly as we did with job timings in lesson 02.
 
 ## 5. Forks: the part that bites people
 
