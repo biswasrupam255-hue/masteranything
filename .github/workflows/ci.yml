@@ -1,44 +1,75 @@
 # .github/workflows/ci.yml
-# Lesson 01 — the simplest honest pipeline. We make it faster in lesson 02.
+# Lesson 02 — same checks, but parallel, cheaper and tested on more than one Node.
 
 name: CI
 
-# WHEN to run. These two cover ~90% of real-world CI.
 on:
   push:
     branches: [main]
+    # Editing docs should not burn CI minutes.
+    paths-ignore: ["**.md", "lessons/**"]
   pull_request:
 
+# Push twice in a minute and the first run is pointless. Cancel it.
+# Group per branch/PR so other people's runs are untouched.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege. This workflow only reads code; say so explicitly.
+# Without this, the token gets whatever the repo default is.
+permissions:
+  contents: read
+
 jobs:
-  # "verify" is just a name we chose. It appears in the GitHub UI.
-  verify:
-    # A fresh, empty Ubuntu VM. Nothing of yours is on it.
+  # ---------------------------------------------------------------- quality
+  # Fast static checks. Fails in ~20s, before the slower jobs matter.
+  quality:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 10        # a hung job dies instead of burning 6 hours
     steps:
-      # Our repo is NOT on the runner until we ask for it.
-      - name: Check out the code
-        uses: actions/checkout@v7
-
-      - name: Set up Node
-        uses: actions/setup-node@v7
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version-file: .nvmrc   # same Node version as your laptop
-          cache: npm                  # reuse ~/.npm between runs
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
 
-      # npm ci, not npm install: installs exactly package-lock.json,
-      # fails if the lockfile and package.json disagree. Reproducible.
-      - name: Install dependencies
-        run: npm ci
+  # ------------------------------------------------------------------- test
+  # One VM per Node version, all at the same time.
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      # Default is true: one red cell kills the others instantly.
+      # We want the full picture - "broken on 22, fine on 24" is the useful answer.
+      fail-fast: false
+      matrix:
+        node: ["22", "24"]
+    # Name the cell so the UI reads "test (22)" not "test (1)".
+    name: test (node ${{ matrix.node }})
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test
-        run: npm test
-
-      - name: Build
-        run: npm run build
+  # ------------------------------------------------------------------ build
+  # Only worth doing if everything above is green. `needs` makes the edge.
+  build:
+    needs: [quality, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
