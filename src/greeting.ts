@@ -5,5 +5,5 @@ export function greet(name: string): string {
     throw new Error("name is required");
   }
 
-  return `Hi, ${trimmed}!`;
+  return `Hello, ${trimmed}!`;
 }
