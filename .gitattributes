@@ -1,0 +1,3 @@
+# Keep line endings LF in the repo. Windows checkouts still get CRLF locally,
+# but Linux CI runners and Docker containers never see a stray \r.
+* text=auto eol=lf
