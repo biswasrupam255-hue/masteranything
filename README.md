@@ -37,6 +37,11 @@ Work through them in order. Each one ends with you pushing a commit and watching
 - [x] **07 — [Continuous delivery](lessons/07-continuous-delivery.md)** — a deploy job, staging vs production, promotion, rollback
 - [ ] **08 — [Team guardrails](lessons/08-team-guardrails.md)** — Dependabot, CODEOWNERS, pre-commit hooks, reusable workflows
 
+## Drills
+
+[DRILLS.md](DRILLS.md) — ten planted failures to diagnose yourself, with the answers hidden.
+Reading about a failure teaches you nothing; finding one teaches you everything.
+
 ## Vocabulary, once
 
 - **CI (continuous integration)** — every push gets automatically built and tested.
