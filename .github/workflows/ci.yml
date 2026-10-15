@@ -25,11 +25,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/node-setup
       - run: npm run lint
       - run: npm run typecheck
 
@@ -44,11 +40,9 @@ jobs:
     name: test (node ${{ matrix.node }})
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/node-setup
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
-      - run: npm ci
 
       # Every cell proves the tests pass...
       - name: Test
@@ -82,11 +76,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/node-setup
       - run: npm run build
 
       # THE point of this lesson: the compiled output survives the VM.
@@ -107,15 +97,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
       # --omit=dev: production deps only, exactly like a real server.
       # If a runtime import accidentally lives in devDependencies, this fails
       # here instead of in production at 3am.
-      - run: npm ci --omit=dev
+      - uses: ./.github/actions/node-setup
+        with:
+          install-flags: "--omit=dev"
 
       - name: Download dist/ from the build job
         uses: actions/download-artifact@v8
