@@ -25,11 +25,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/node-setup
       - run: npm run lint
       - run: npm run typecheck
 
@@ -44,11 +40,9 @@ jobs:
     name: test (node ${{ matrix.node }})
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/node-setup
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
-      - run: npm ci
 
       # Every cell proves the tests pass...
       - name: Test
@@ -82,11 +76,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/node-setup
       - run: npm run build
 
       # THE point of this lesson: the compiled output survives the VM.
@@ -107,15 +97,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
       # --omit=dev: production deps only, exactly like a real server.
       # If a runtime import accidentally lives in devDependencies, this fails
       # here instead of in production at 3am.
-      - run: npm ci --omit=dev
+      - uses: ./.github/actions/node-setup
+        with:
+          install-flags: "--omit=dev"
 
       - name: Download dist/ from the build job
         uses: actions/download-artifact@v8
@@ -263,7 +250,9 @@ jobs:
   # deployment secrets - see lesson 05 on forks.
   deploy-staging:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [ci-ok]
+    # `image` is in needs purely to read its digest output. This is how you
+    # promote the EXACT artifact that was tested, instead of rebuilding.
+    needs: [ci-ok, image]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Naming an environment is what unlocks that environment's secrets and
@@ -286,6 +275,7 @@ jobs:
           DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
         run: |
           echo "deploying ${GITHUB_SHA::7} to ${{ vars.TARGET_URL }}"
+          echo "image: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}"
           echo "artifact contents:"
           ls -1 dist
           # Check a secret exists WITHOUT printing it.
@@ -315,7 +305,7 @@ jobs:
   # reviewer, so the job PAUSES here until a human clicks Approve.
   deploy-production:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [deploy-staging]
+    needs: [deploy-staging, image]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
@@ -332,6 +322,8 @@ jobs:
           DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
         run: |
           echo "deploying ${GITHUB_SHA::7} to ${{ vars.TARGET_URL }}"
+          # The SAME digest staging ran. Not a rebuild - promotion.
+          echo "image: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}"
           # Same name, DIFFERENT value: this is the production environment's
           # secret, which the staging job could not read.
           echo "token length: ${#DEPLOY_TOKEN}"

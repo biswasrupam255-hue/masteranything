@@ -1,0 +1,45 @@
+# .github/actions/node-setup/action.yml
+# A composite action: a reusable group of STEPS, used with `uses: ./path`.
+#
+# Why: setup-node + npm ci appeared in five jobs. Now the pinned action
+# version lives in exactly one file, so upgrading is a one-line change
+# instead of five easy-to-miss ones.
+#
+# (A composite action cannot check out the repo - the checkout is what makes
+# this file available. Jobs still run actions/checkout first.)
+
+name: Node setup
+description: Set up Node with an npm cache and install from the lockfile.
+
+inputs:
+  node-version:
+    description: Node version to use. Empty means read .nvmrc.
+    required: false
+    default: ""
+  install-flags:
+    description: 'Extra flags for npm ci, e.g. "--omit=dev".'
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # Pinned to a commit SHA, not a tag. Tags are mutable: whoever controls
+    # actions/setup-node can repoint v7 at new code tomorrow, and it runs
+    # inside your CI with your token. A SHA cannot be repointed.
+    # The trailing comment is what keeps it readable - and what Dependabot
+    # updates for you.
+    - if: inputs.node-version == ''
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version-file: .nvmrc
+        cache: npm
+
+    - if: inputs.node-version != ''
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+
+    - shell: bash
+      run: npm ci ${{ inputs.install-flags }}

@@ -1,0 +1,13 @@
+# .github/CODEOWNERS
+# Who gets auto-requested for review on which paths. Combined with branch
+# protection's "require review from Code Owners", it becomes a hard rule
+# rather than a hope.
+#
+# Last matching pattern wins - so put the specific ones at the BOTTOM.
+
+* @biswasrupam255-hue
+
+# CI and deployment config is where a mistake is most expensive, so in a real
+# team these lines point at a different, smaller group than the catch-all.
+/.github/        @biswasrupam255-hue
+/Dockerfile      @biswasrupam255-hue

@@ -1,0 +1,50 @@
+# .github/dependabot.yml
+# Opens PRs for outdated dependencies. Your CI then tells you whether the
+# update is safe - which is the only reason this is useful rather than noise.
+
+version: 2
+updates:
+  # ---------------------------------------------------------------- npm
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # Grouping is the difference between "a useful PR" and "14 PRs nobody
+      # reviews". One PR for all dev-dependency bumps; CI vets it as a unit.
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+      production-patches:
+        dependency-type: production
+        update-types: [patch]
+    # Production majors and minors arrive as individual PRs on purpose:
+    # those deserve to be read.
+
+  # ------------------------------------------------------ github actions
+  # Keeps SHA pins current. This is what makes pinning by SHA practical
+  # instead of a thing you do once and then let rot for two years.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Composite actions in subdirectories need their own entry - Dependabot
+  # does not discover them from "/".
+  - package-ecosystem: github-actions
+    directory: "/.github/actions/node-setup"
+    schedule:
+      interval: weekly
+
+  # ------------------------------------------------------------- docker
+  # Watches the FROM lines in the Dockerfile for new node:24-alpine builds,
+  # which is where most of your CVE exposure actually lives.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
