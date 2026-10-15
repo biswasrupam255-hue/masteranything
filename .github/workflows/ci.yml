@@ -1,32 +1,28 @@
 # .github/workflows/ci.yml
-# Lesson 02 — same checks, but parallel, cheaper and tested on more than one Node.
+# Lesson 04 — build once, keep the output, report what happened.
 
 name: CI
 
 on:
   push:
     branches: [main]
-    # Editing docs should not burn CI minutes.
     paths-ignore: ["**.md", "lessons/**"]
+  # NOTE: deliberately no paths-ignore here. Once "ci-ok" is a required check,
+  # a PR that triggers no run can never satisfy it and hangs forever.
   pull_request:
 
-# Push twice in a minute and the first run is pointless. Cancel it.
-# Group per branch/PR so other people's runs are untouched.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Least privilege. This workflow only reads code; say so explicitly.
-# Without this, the token gets whatever the repo default is.
 permissions:
   contents: read
 
 jobs:
   # ---------------------------------------------------------------- quality
-  # Fast static checks. Fails in ~20s, before the slower jobs matter.
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 10        # a hung job dies instead of burning 6 hours
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -38,17 +34,13 @@ jobs:
       - run: npm run typecheck
 
   # ------------------------------------------------------------------- test
-  # One VM per Node version, all at the same time.
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
-      # Default is true: one red cell kills the others instantly.
-      # We want the full picture - "broken on 22, fine on 24" is the useful answer.
       fail-fast: false
       matrix:
         node: ["22", "24"]
-    # Name the cell so the UI reads "test (22)" not "test (1)".
     name: test (node ${{ matrix.node }})
     steps:
       - uses: actions/checkout@v7
@@ -57,12 +49,35 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - run: npm test
+
+      # Every cell proves the tests pass...
+      - name: Test
+        if: matrix.node != '24'
+        run: npm test
+
+      # ...but only ONE cell produces coverage. Two cells uploading an artifact
+      # of the same name is an error (artifact names must be unique per run).
+      # If you do want one per cell: name: coverage-node-${{ matrix.node }}
+      - name: Test with coverage
+        if: matrix.node == '24'
+        run: npm run test:coverage
+
+      - name: Write coverage to the job summary
+        if: matrix.node == '24'
+        run: node scripts/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the clickable HTML coverage report
+        if: matrix.node == '24'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-html
+          path: coverage/
+          retention-days: 7
+          if-no-files-found: error   # silence here would mean a broken report
 
   # ------------------------------------------------------------------ build
-  # Only worth doing if everything above is green. `needs` makes the edge.
   build:
-    needs: [quality, test]
+    needs: [quality]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -74,19 +89,68 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+      # THE point of this lesson: the compiled output survives the VM.
+      - name: Upload dist/
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------ smoke
+  # Runs the ARTEFACT, not the source. This is the first job that tests the
+  # thing you would actually deploy.
+  smoke:
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # --omit=dev: production deps only, exactly like a real server.
+      # If a runtime import accidentally lives in devDependencies, this fails
+      # here instead of in production at 3am.
+      - run: npm ci --omit=dev
+
+      - name: Download dist/ from the build job
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - name: Boot it and probe /health
+        run: |
+          node dist/server.js &
+          SERVER_PID=$!
+          for i in $(seq 1 20); do
+            if curl -fsS http://localhost:3000/health -o health.json; then break; fi
+            sleep 0.5
+          done
+          echo "response: $(cat health.json)"
+          test "$(jq -r .status < health.json)" = "ok"
+          kill "$SERVER_PID"
+
+      - name: Report it
+        run: |
+          {
+            echo "### Smoke test"
+            echo ""
+            echo '```json'
+            cat health.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # ------------------------------------------------------------------ ci-ok
-  # The ONLY check we require in branch protection.
-  #
-  # Why: required checks are matched by name. Require "test (node 22)" directly
-  # and the day you bump the matrix to 24/26, protection waits forever for a
-  # check that will never report again. This name never changes.
-  #
-  # if: always() is load-bearing. Without it, a failed upstream job makes this
-  # job *skipped*, a skipped required check never reports, and your PR hangs
-  # on a pending gate instead of showing a clean red X.
+  # Still the only required check. We just added a whole new job above and
+  # branch protection needed zero changes. That is why this job exists.
   ci-ok:
     if: always()
-    needs: [quality, test, build]
+    needs: [quality, test, build, smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
