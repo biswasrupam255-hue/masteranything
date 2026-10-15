@@ -13,9 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test:coverage": "vitest run --coverage"
   },
-  "dependencies": {
-    "express": "^5.3.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
@@ -23,6 +21,7 @@
     "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "^5.0.5",
     "eslint": "^10.12.0",
+    "express": "^5.3.0",
     "globals": "^17.13.0",
     "supertest": "^7.3.1",
     "tsx": "^4.23.15",
