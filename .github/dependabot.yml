@@ -48,3 +48,10 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    ignore:
+      # Node MAJORS are pinned to .nvmrc, not chosen by a bot. A bump to a
+      # major nothing tests produced exactly that: CI ran on 22 and 24 while
+      # the shipped image ran 25, which vitest does not even support.
+      # Patches and minors are still welcome - that is where CVE fixes live.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]

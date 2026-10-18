@@ -86,6 +86,35 @@ to be read.
 required checks is a liability. Into this repo, every bump must pass `ci-ok` before it can
 land.
 
+### What actually happened here: green and still wrong
+
+Dependabot's first PR on this repo bumped the Dockerfile from `node:24-alpine` to
+`node:25-alpine`. Every check passed, so it was merged. Then:
+
+| | Node version |
+| --- | --- |
+| `.nvmrc` (quality, build, smoke) | 24 |
+| test matrix | 22, 24 |
+| `Dockerfile` - what actually ships | **25** |
+| `vitest` supported engines | `^22.12 || ^24 || >=26` - 25 **excluded** |
+
+CI was green because every job tested 22 and 24. The container we would deploy ran 25, which
+nothing tested and the test runner does not support. `container-smoke` passed because it
+only probes `/health`.
+
+**CI only checks what you tell it to check.** No job asserted that the Dockerfile and
+`.nvmrc` agree, so nothing noticed. Two fixes, both needed:
+
+1. `ignore` Node majors in `dependabot.yml` - the base image major follows `.nvmrc`, which is
+   a human decision, not a bot one. Patches and minors still come through, and that is where
+   CVE fixes live.
+2. [`scripts/check-node-version.mjs`](../scripts/check-node-version.mjs) in the `quality`
+   job, failing the build when `.nvmrc`, the Dockerfile and the matrix disagree.
+
+The generalisable lesson: **every time two files have to agree, write the check that asserts
+it.** Version drift between config files is invisible to tests by construction - the tests
+only ever run one of the two.
+
 ## 4. CODEOWNERS
 
 [`.github/CODEOWNERS`](../.github/CODEOWNERS) auto-requests reviewers per path. **Last
