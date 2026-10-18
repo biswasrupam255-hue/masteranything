@@ -32,6 +32,10 @@ jobs:
       # A run: block that loses its indentation still parses as YAML
       # but is rejected by GitHub - this catches it before it ships.
       - run: npm run check:workflows
+      # Every place that names a Node version must agree: .nvmrc, the
+      # Dockerfile and the test matrix. A green bump to an untested major
+      # is how this repo once shipped Node 25 while testing on 22 and 24.
+      - run: npm run check:node
 
   # ------------------------------------------------------------------- test
   test:

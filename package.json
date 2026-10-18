@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:coverage": "vitest run --coverage",
-    "check:workflows": "node scripts/check-workflows.mjs"
+    "check:workflows": "node scripts/check-workflows.mjs",
+    "check:node": "node scripts/check-node-version.mjs"
   },
   "dependencies": {
     "express": "^5.3.0"
